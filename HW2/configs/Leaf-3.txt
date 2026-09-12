@@ -1,0 +1,74 @@
+Leaf-3#sh run | no-more
+! Command: show running-config
+! device: Leaf-3 (vEOS-lab, EOS-4.29.2F)
+!
+! boot system flash:/vEOS-lab.swi
+!
+no aaa root
+!
+username admin privilege 15 role network-admin secret sha512 $6$I8EANcjR4uRrVlAF$NzMXwcHy4nVZIXzDnwwz29Tr87GmCYkJ0tY0G4f0QZ/Rp6htO0jQeMw07AWerBZU5b.RAGgWUoDd0JRc5uDSx0
+!
+transceiver qsfp default-mode 4x10G
+!
+service routing protocols model ribd
+!
+hostname Leaf-3
+!
+spanning-tree mode mstp
+!
+vrf instance mgmt
+!
+interface Ethernet1
+   description Spine-1 e3
+   mtu 9000
+   no switchport
+   ip address 10.10.3.2/30
+   ip ospf network point-to-point
+   ip ospf area 0.0.0.0
+!
+interface Ethernet2
+   description Spine-2 e3
+   mtu 9000
+   no switchport
+   ip address 10.10.13.2/30
+   ip ospf network point-to-point
+   ip ospf area 0.0.0.0
+!
+interface Ethernet3
+   mtu 9000
+!
+interface Ethernet4
+   mtu 9000
+!
+interface Ethernet5
+   mtu 9000
+!
+interface Ethernet6
+   mtu 9000
+!
+interface Ethernet7
+   mtu 9000
+!
+interface Ethernet8
+   mtu 9000
+!
+interface Loopback0
+   ip address 1.1.1.3/32
+   ip ospf area 0.0.0.0
+!
+interface Management1
+   vrf mgmt
+   ip address dhcp
+   dhcp client accept default-route
+!
+ip routing
+no ip routing vrf mgmt
+!
+router ospf 1
+   router-id 1.1.1.3
+   max-lsa 12000
+!
+management ssh
+   vrf mgmt
+!
+end
