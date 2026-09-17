@@ -1,0 +1,79 @@
+Spine-2#sh run | no-more
+! Command: show running-config
+! device: Spine-2 (vEOS-lab, EOS-4.29.2F)
+!
+! boot system flash:/vEOS-lab.swi
+!
+no aaa root
+!
+username admin privilege 15 role network-admin secret sha512 $6$I8EANcjR4uRrVlAF$NzMXwcHy4nVZIXzDnwwz29Tr87GmCYkJ0tY0G4f0QZ/Rp6htO0jQeMw07AWerBZU5b.RAGgWUoDd0JRc5uDSx0
+!
+transceiver qsfp default-mode 4x10G
+!
+service routing protocols model ribd
+!
+hostname Spine-2
+!
+spanning-tree mode mstp
+!
+vrf instance mgmt
+!
+interface Ethernet1
+   description Leaf-1 e2
+   mtu 9000
+   no switchport
+   ip address 10.10.11.1/30
+   ip ospf network point-to-point
+!
+interface Ethernet2
+   description Leaf-2 e2
+   mtu 9000
+   no switchport
+   ip address 10.10.12.1/30
+   ip ospf network point-to-point
+!
+interface Ethernet3
+   description Leaf-3 e2
+   mtu 9000
+   no switchport
+   ip address 10.10.13.1/30
+   ip ospf network point-to-point
+!
+interface Ethernet4
+   mtu 9000
+!
+interface Ethernet5
+   mtu 9000
+!
+interface Ethernet6
+   mtu 9000
+!
+interface Ethernet7
+   mtu 9000
+!
+interface Ethernet8
+   mtu 9000
+!
+interface Management1
+   vrf mgmt
+   ip address dhcp
+   dhcp client accept default-route
+!
+ip routing
+no ip routing vrf mgmt
+!
+router bgp 65200
+   router-id 10.10.11.1
+   neighbor 10.10.11.2 remote-as 65001
+   neighbor 10.10.12.2 remote-as 65002
+   neighbor 10.10.13.2 remote-as 65003
+   !
+   address-family ipv4
+      neighbor 10.10.11.2 activate
+      neighbor 10.10.12.2 activate
+      neighbor 10.10.13.2 activate
+!
+management ssh
+   vrf mgmt
+!
+end
