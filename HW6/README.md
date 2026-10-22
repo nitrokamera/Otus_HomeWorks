@@ -103,7 +103,6 @@ vrf TENANT-A
       rd <self_ip-of-loopback0>:50001
       route-target import evpn 65100:50001
       route-target export evpn 65100:50001
-      redistribute connected
 
 ```
 Проверка доступности между хостами. Так как Ping это двухсторонняя проверка, то достаточно провести тест с одного хоста и пропинговать каждый удаленный:
@@ -145,6 +144,151 @@ PING 192.168.10.15 (192.168.10.15) 56(84) bytes of data.
 --- 192.168.10.15 ping statistics ---
 3 packets transmitted, 3 received, 0% packet loss, time 2004ms
 rtt min/avg/max/mdev = 11.512/46.038/114.802/48.623 ms
+```
+
+Проверка маршрутов EVPN type-2 и таблицы маршрутизации VRF TENANT-A:
+
+```
+Leaf-1#sh ip route vrf TENANT-A
+
+Gateway of last resort is not set
+
+ B E      192.168.10.16/32 [200/0] via VTEP 1.1.1.2 VNI 50001 router-mac 50:cb:43:fc:98:ec local-interface Vxlan1
+ B E      192.168.10.17/32 [200/0] via VTEP 1.1.1.3 VNI 50001 router-mac 50:b7:83:7b:2d:ba local-interface Vxlan1
+ C        192.168.10.0/24 is directly connected, Vlan10
+ B E      192.168.20.18/32 [200/0] via VTEP 1.1.1.3 VNI 50001 router-mac 50:b7:83:7b:2d:ba local-interface Vxlan1
+ C        192.168.20.0/24 is directly connected, Vlan20
+
+ Leaf-1#sh bgp evpn route-type mac-ip
+BGP routing table information for VRF default
+Router identifier 1.1.1.1, local AS number 65001
+Route status codes: * - valid, > - active, S - Stale, E - ECMP head, e - ECMP
+                    c - Contributing to ECMP, % - Pending BGP convergence
+Origin codes: i - IGP, e - EGP, ? - incomplete
+AS Path Attributes: Or-ID - Originator ID, C-LST - Cluster List, LL Nexthop - Link Local Nexthop
+
+          Network                Next Hop              Metric  LocPref Weight  Path
+ * >Ec    RD: 1.1.1.3:20 mac-ip 5040.dd01.6201
+                                 1.1.1.3               -       100     0       65100 65003 i
+ *  ec    RD: 1.1.1.3:20 mac-ip 5040.dd01.6201
+                                 1.1.1.3               -       100     0       65100 65003 i
+ * >Ec    RD: 1.1.1.3:20 mac-ip 5040.dd01.6201 192.168.20.18
+                                 1.1.1.3               -       100     0       65100 65003 i
+ *  ec    RD: 1.1.1.3:20 mac-ip 5040.dd01.6201 192.168.20.18
+                                 1.1.1.3               -       100     0       65100 65003 i
+ * >      RD: 1.1.1.1:10 mac-ip 50bb.4401.5f01
+                                 -                     -       -       0       i
+ * >      RD: 1.1.1.1:10 mac-ip 50bb.4401.5f01 192.168.10.15
+                                 -                     -       -       0       i
+ * >Ec    RD: 1.1.1.2:10 mac-ip 50de.a401.6001
+                                 1.1.1.2               -       100     0       65100 65002 i
+ *  ec    RD: 1.1.1.2:10 mac-ip 50de.a401.6001
+                                 1.1.1.2               -       100     0       65100 65002 i
+ * >Ec    RD: 1.1.1.2:10 mac-ip 50de.a401.6001 192.168.10.16
+                                 1.1.1.2               -       100     0       65100 65002 i
+ *  ec    RD: 1.1.1.2:10 mac-ip 50de.a401.6001 192.168.10.16
+                                 1.1.1.2               -       100     0       65100 65002 i
+ * >Ec    RD: 1.1.1.3:10 mac-ip 50ec.6b01.6101
+                                 1.1.1.3               -       100     0       65100 65003 i
+ *  ec    RD: 1.1.1.3:10 mac-ip 50ec.6b01.6101
+                                 1.1.1.3               -       100     0       65100 65003 i
+ * >Ec    RD: 1.1.1.3:10 mac-ip 50ec.6b01.6101 192.168.10.17
+                                 1.1.1.3               -       100     0       65100 65003 i
+ *  ec    RD: 1.1.1.3:10 mac-ip 50ec.6b01.6101 192.168.10.17
+                                 1.1.1.3               -       100     0       65100 65003 i
+
+
+Leaf-2#sh ip route vrf TENANT-A
+
+Gateway of last resort is not set
+
+ B E      192.168.10.15/32 [200/0] via VTEP 1.1.1.1 VNI 50001 router-mac 50:9a:5f:3d:b4:4a local-interface Vxlan1
+ B E      192.168.10.17/32 [200/0] via VTEP 1.1.1.3 VNI 50001 router-mac 50:b7:83:7b:2d:ba local-interface Vxlan1
+ C        192.168.10.0/24 is directly connected, Vlan10
+ B E      192.168.20.18/32 [200/0] via VTEP 1.1.1.3 VNI 50001 router-mac 50:b7:83:7b:2d:ba local-interface Vxlan1
+ C        192.168.20.0/24 is directly connected, Vlan20
+
+Leaf-2#sh bgp evpn route-type mac-ip
+BGP routing table information for VRF default
+Router identifier 1.1.1.2, local AS number 65002
+Route status codes: * - valid, > - active, S - Stale, E - ECMP head, e - ECMP
+                    c - Contributing to ECMP, % - Pending BGP convergence
+Origin codes: i - IGP, e - EGP, ? - incomplete
+AS Path Attributes: Or-ID - Originator ID, C-LST - Cluster List, LL Nexthop - Link Local Nexthop
+
+          Network                Next Hop              Metric  LocPref Weight  Path
+ * >Ec    RD: 1.1.1.3:20 mac-ip 5040.dd01.6201
+                                 1.1.1.3               -       100     0       65100 65003 i
+ *  ec    RD: 1.1.1.3:20 mac-ip 5040.dd01.6201
+                                 1.1.1.3               -       100     0       65100 65003 i
+ * >Ec    RD: 1.1.1.3:20 mac-ip 5040.dd01.6201 192.168.20.18
+                                 1.1.1.3               -       100     0       65100 65003 i
+ *  ec    RD: 1.1.1.3:20 mac-ip 5040.dd01.6201 192.168.20.18
+                                 1.1.1.3               -       100     0       65100 65003 i
+ * >Ec    RD: 1.1.1.1:10 mac-ip 50bb.4401.5f01
+                                 1.1.1.1               -       100     0       65100 65001 i
+ *  ec    RD: 1.1.1.1:10 mac-ip 50bb.4401.5f01
+                                 1.1.1.1               -       100     0       65100 65001 i
+ * >Ec    RD: 1.1.1.1:10 mac-ip 50bb.4401.5f01 192.168.10.15
+                                 1.1.1.1               -       100     0       65100 65001 i
+ *  ec    RD: 1.1.1.1:10 mac-ip 50bb.4401.5f01 192.168.10.15
+                                 1.1.1.1               -       100     0       65100 65001 i
+ * >      RD: 1.1.1.2:10 mac-ip 50de.a401.6001
+                                 -                     -       -       0       i
+ * >      RD: 1.1.1.2:10 mac-ip 50de.a401.6001 192.168.10.16
+                                 -                     -       -       0       i
+ * >Ec    RD: 1.1.1.3:10 mac-ip 50ec.6b01.6101
+                                 1.1.1.3               -       100     0       65100 65003 i
+ *  ec    RD: 1.1.1.3:10 mac-ip 50ec.6b01.6101
+                                 1.1.1.3               -       100     0       65100 65003 i
+ * >Ec    RD: 1.1.1.3:10 mac-ip 50ec.6b01.6101 192.168.10.17
+                                 1.1.1.3               -       100     0       65100 65003 i
+ *  ec    RD: 1.1.1.3:10 mac-ip 50ec.6b01.6101 192.168.10.17
+                                 1.1.1.3               -       100     0       65100 65003 i
+
+
+ Leaf-3#sh ip route vrf TENANT-A
+
+Gateway of last resort is not set
+
+ B E      192.168.10.15/32 [200/0] via VTEP 1.1.1.1 VNI 50001 router-mac 50:9a:5f:3d:b4:4a local-interface Vxlan1
+ B E      192.168.10.16/32 [200/0] via VTEP 1.1.1.2 VNI 50001 router-mac 50:cb:43:fc:98:ec local-interface Vxlan1
+ C        192.168.10.0/24 is directly connected, Vlan10
+ C        192.168.20.0/24 is directly connected, Vlan20
+
+Leaf-3#sh bgp evpn route-type mac-ip
+BGP routing table information for VRF default
+Router identifier 1.1.1.3, local AS number 65003
+Route status codes: * - valid, > - active, S - Stale, E - ECMP head, e - ECMP
+                    c - Contributing to ECMP, % - Pending BGP convergence
+Origin codes: i - IGP, e - EGP, ? - incomplete
+AS Path Attributes: Or-ID - Originator ID, C-LST - Cluster List, LL Nexthop - Link Local Nexthop
+
+          Network                Next Hop              Metric  LocPref Weight  Path
+ * >      RD: 1.1.1.3:20 mac-ip 5040.dd01.6201
+                                 -                     -       -       0       i
+ * >      RD: 1.1.1.3:20 mac-ip 5040.dd01.6201 192.168.20.18
+                                 -                     -       -       0       i
+ * >Ec    RD: 1.1.1.1:10 mac-ip 50bb.4401.5f01
+                                 1.1.1.1               -       100     0       65100 65001 i
+ *  ec    RD: 1.1.1.1:10 mac-ip 50bb.4401.5f01
+                                 1.1.1.1               -       100     0       65100 65001 i
+ * >Ec    RD: 1.1.1.1:10 mac-ip 50bb.4401.5f01 192.168.10.15
+                                 1.1.1.1               -       100     0       65100 65001 i
+ *  ec    RD: 1.1.1.1:10 mac-ip 50bb.4401.5f01 192.168.10.15
+                                 1.1.1.1               -       100     0       65100 65001 i
+ * >Ec    RD: 1.1.1.2:10 mac-ip 50de.a401.6001
+                                 1.1.1.2               -       100     0       65100 65002 i
+ *  ec    RD: 1.1.1.2:10 mac-ip 50de.a401.6001
+                                 1.1.1.2               -       100     0       65100 65002 i
+ * >Ec    RD: 1.1.1.2:10 mac-ip 50de.a401.6001 192.168.10.16
+                                 1.1.1.2               -       100     0       65100 65002 i
+ *  ec    RD: 1.1.1.2:10 mac-ip 50de.a401.6001 192.168.10.16
+                                 1.1.1.2               -       100     0       65100 65002 i
+ * >      RD: 1.1.1.3:10 mac-ip 50ec.6b01.6101
+                                 -                     -       -       0       i
+ * >      RD: 1.1.1.3:10 mac-ip 50ec.6b01.6101 192.168.10.17
+                                 -                     -       -       0       i
 ```
 
 [Конфигурационные файлы](configs/)

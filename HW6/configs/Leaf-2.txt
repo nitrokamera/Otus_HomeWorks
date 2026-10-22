@@ -118,7 +118,6 @@ router bgp 65002
       rd 1.1.1.2:50001
       route-target import evpn 65100:50001
       route-target export evpn 65100:50001
-      redistribute connected
 !
 management ssh
    vrf mgmt
