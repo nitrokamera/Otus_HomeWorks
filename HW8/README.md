@@ -8,8 +8,8 @@
 
 1. Сервер lnx-deb-15 подключается в Leaf1 Eth3 (Vlan 10, vrf TENENT-A, Anycast-Gateway). Сервер lnx-deb-18 подключается в Leaf3 Eth4 (Vlan 20, vrf TENENT-B, Anycast-Gateway).
 2. На leaf1 - удалить всю ранее созданную конфигурацию связанной с Vlan20 (SVI, BGP etc). На leaf3 - удалить всю ранее созданную конфигурацию связанной с Vlan10 (SVI, BGP etc) и TENANT-A.
-3. В качестве BGW устройства, определить Leaf2, который будет анонсировать Connected сети в фабрику, сделать на Leaf2 необходимые настройки.
-4. Выполнить необходимые настройки на Leaf узлах для организации маршрутизации между сетями TENENT-A и TENENT-B.
+3. Добавить в топологию маршрутизатор подключенный к Leaf2 Ethernet3, на который будет ссылаться статический маршрут по умолчанию в разных VRF (на Leaf2), сделать на Leaf2 необходимые настройки, в том числе для распространения маршрута по умолчанию в фабрике.
+4. Выполнить необходимые настройки на Leaf узлах для организации маршрутизации между сетями TENENT-A и TENENT-B, а так же выполнить необходимые настройки на Router.
 5. Опционально. Выполнить проверку связности между сетями TENENT-A и TENENT-B узлов Leaf1/3
 
 ![](HW1_CLOSE_TOPO.png)
@@ -26,6 +26,8 @@
         | 10.10.12.0/30    | 10.10.0.0/16   | P2P Spine2-Leaf2   | Eth2-Eth2          | 10.10.12.1/10.10.12.2       |
         | 10.10.3.0/30     | 10.10.0.0/16   | P2P Spine1-Leaf3   | Eth3-Eth1          | 10.10.3.1/10.10.3.2         |
         | 10.10.13.0/30    | 10.10.0.0/16   | P2P Spine2-Leaf3   | Eth3-Eth2          | 10.10.13.1/10.10.13.2       |
+        | 10.10.10.0/30    | 10.10.10.0/30  | P2P Router-Leaf2   | Gi0/0.1-Eth3.1     | 10.10.10.2/10.10.10.1       |
+        | 10.10.20.0/30    | 10.10.20.0/30  | P2P Router-Leaf2   | Gi0/0.2-Eth3.2     | 10.10.20.2/10.10.20.1       |
 
       Третий октет подразумевает номер Leaf коммутатора. Если видим в третьем октете единицу, то это подключение Leaf1 к Spine1.
       Если видим в третьем октете 11, то это подключение Leaf1 к Spine2 и т.д.
@@ -76,21 +78,55 @@ Leaf3:
 Leaf-3(config)# no int vlan 10
 Leaf-3(config)# interface Vxlan1
 Leaf-3(config-if-Vx1)# no vxlan vlan 10 vni 10010
+Leaf-3(config-if-Vx1)# no vxlan vrf TENANT-B vni 50001
 Leaf-3(config)# router bgp 65003
 Leaf-3(config-router-bgp)# no vlan 10
 Leaf-3(config-router-bgp)# no vrf TENANT-A
 ```
 
-3. В качестве BGW устройства, определить Leaf2, который будет анонсировать Connected сети в фабрику, сделать на Leaf2 необходимые настройки.
+3. Добавить в топологию маршрутизатор подключенный к Leaf2 Ethernet3, на который будет ссылаться статический маршрут по умолчанию в разных VRF (на Leaf2), сделать на Leaf2 необходимые настройки, в том числе для распространения маршрута по умолчанию в фабрике.
 
 Leaf2:
 ```
-Leaf-2(config)# router bgp 65002
-Leaf-2(config-router-bgp)# vrf TENANT-A
-Leaf-2(config-router-bgp-vrf-TENANT-A)# redistribute connected
+vrf instance TENANT-B
+ip routing vrf TENANT-B
+
+interface Ethernet3
+   no switchport
+!
+interface Ethernet3.1
+   encapsulation dot1q vlan 100
+   vrf TENANT-A
+   ip address 10.10.10.1/30
+!
+interface Ethernet3.2
+   encapsulation dot1q vlan 200
+   vrf TENANT-B
+   ip address 10.10.20.1/30
+
+interface Vlan10
+   shutdown
+interface Vlan20
+   shutdown
+
+ip route vrf TENANT-A 0.0.0.0/0 10.10.10.2
+ip route vrf TENANT-B 0.0.0.0/0 10.10.20.2
+
+router bgp 65002
+vrf TENANT-A
+redistribute static
+
+vrf TENANT-B
+rd 1.1.1.2:50002
+route-target import evpn 65100:50002
+route-target export evpn 65100:50002
+redistribute static
+
+interface Vxlan1
+vxlan vrf TENANT-B vni 50002
 ```
 
-4. Выполнить необходимые настройки на Leaf узлах для организации маршрутизации между сетями TENENT-A и TENENT-B.
+4. Выполнить необходимые настройки на Leaf узлах для организации маршрутизации между сетями TENENT-A и TENENT-B, а так же выполнить необходимые настройки на Router.
 
 Leaf3:
 ```
@@ -103,9 +139,25 @@ Leaf-3(config-if-Vl20)# ip address virtual 192.168.20.1/24
 
 Leaf-3(config)# router bgp 65003
 Leaf-3(config-router-bgp)# vrf TENANT-B
-Leaf-3(config-router-bgp-vrf-TENANT-B)# rd 1.1.1.3:50001
-Leaf-3(config-router-bgp-vrf-TENANT-B)# route-target import evpn 65100:50001
-Leaf-3(config-router-bgp-vrf-TENANT-B)# route-target export evpn 65100:50001
+Leaf-3(config-router-bgp-vrf-TENANT-B)# rd 1.1.1.3:50002
+Leaf-3(config-router-bgp-vrf-TENANT-B)# route-target import evpn 65100:50002
+Leaf-3(config-router-bgp-vrf-TENANT-B)# route-target export evpn 65100:50002
+
+interface Vxlan1
+vxlan vrf TENANT-B vni 50002
+```
+Router:
+```
+interface GigabitEthernet0/0.1
+ encapsulation dot1Q 100
+ ip address 10.10.10.2 255.255.255.252
+!
+interface GigabitEthernet0/0.2
+ encapsulation dot1Q 200
+ ip address 10.10.20.2 255.255.255.252
+!
+ip route 192.168.10.0 255.255.255.0 10.10.10.1
+ip route 192.168.20.0 255.255.255.0 10.10.20.1
 ```
 
 5. Проверка доступности между хостами. Так как Ping это двухсторонняя проверка, то достаточно провести тест с одного хоста и пропинговать удаленный:
@@ -122,13 +174,22 @@ root@lnx-deb-15:~# ip addr show dev ens4
 
 root@lnx-deb-15:~# ping 192.168.20.18 -c 3
 PING 192.168.20.18 (192.168.20.18) 56(84) bytes of data.
-64 bytes from 192.168.20.18: icmp_seq=1 ttl=62 time=20.7 ms
-64 bytes from 192.168.20.18: icmp_seq=2 ttl=62 time=18.2 ms
-64 bytes from 192.168.20.18: icmp_seq=3 ttl=62 time=17.5 ms
+64 bytes from 192.168.20.18: icmp_seq=1 ttl=59 time=23.6 ms
+64 bytes from 192.168.20.18: icmp_seq=2 ttl=59 time=22.4 ms
+64 bytes from 192.168.20.18: icmp_seq=3 ttl=59 time=22.0 ms
 
 --- 192.168.20.18 ping statistics ---
 3 packets transmitted, 3 received, 0% packet loss, time 2003ms
-rtt min/avg/max/mdev = 17.492/18.800/20.662/1.352 ms
+rtt min/avg/max/mdev = 22.006/22.686/23.626/0.686 ms
+
+root@lnx-deb-15:~# traceroute 192.168.20.18
+traceroute to 192.168.20.18 (192.168.20.18), 30 hops max, 60 byte packets
+ 1  192.168.10.1 (192.168.10.1)  8.031 ms  8.841 ms  12.273 ms
+ 2  10.10.10.1 (10.10.10.1)  28.154 ms  28.810 ms  30.624 ms
+ 3  10.10.10.2 (10.10.10.2)  35.682 ms  36.342 ms  40.565 ms
+ 4  10.10.20.1 (10.10.20.1)  46.386 ms  49.067 ms  51.345 ms
+ 5  192.168.20.1 (192.168.20.1)  62.685 ms  63.519 ms  65.700 ms
+ 6  *^C
 ```
 
 Проверка маршрутов EVPN type-5 и таблицы маршрутизации VRF TENANT-A/TENANT-B:
@@ -137,52 +198,76 @@ Leaf-1:
 ```
 Leaf-1#sh ip route vrf TENANT-A
 
-Gateway of last resort is not set
+Gateway of last resort:
+ B E      0.0.0.0/0 [200/0] via VTEP 1.1.1.2 VNI 50001 router-mac 50:cb:43:fc:98:ec local-interface Vxlan1
 
  C        192.168.10.0/24 is directly connected, Vlan10
- B E      192.168.20.0/24 [200/0] via VTEP 1.1.1.2 VNI 50001 router-mac 50:cb:43:fc:98:ec local-interface Vxlan1
 
-Leaf-1#sh bgp evpn route-type ip-prefix 192.168.20.0/24
+Leaf-1#show bgp evpn route-type ip-prefix 0.0.0.0/0
 BGP routing table information for VRF default
 Router identifier 1.1.1.1, local AS number 65001
-BGP routing table entry for ip-prefix 192.168.20.0/24, Route Distinguisher: 1.1.1.2:50001
+BGP routing table entry for ip-prefix 0.0.0.0/0, Route Distinguisher: 1.1.1.2:50001
  Paths: 2 available
   65100 65002
     1.1.1.2 from 100.100.100.100 (10.10.1.1)
-      Origin IGP, metric -, localpref 100, weight 0, tag 0, valid, external, ECMP head, ECMP, best, ECMP contributor
+      Origin INCOMPLETE, metric -, localpref 100, weight 0, tag 0, valid, external, ECMP head, ECMP, best, ECMP contributor
       Extended Community: Route-Target-AS:65100:50001 TunnelEncap:tunnelTypeVxlan EvpnRouterMac:50:cb:43:fc:98:ec
       VNI: 50001
   65100 65002
     1.1.1.2 from 200.200.200.200 (10.10.11.1)
-      Origin IGP, metric -, localpref 100, weight 0, tag 0, valid, external, ECMP, ECMP contributor
+      Origin INCOMPLETE, metric -, localpref 100, weight 0, tag 0, valid, external, ECMP, ECMP contributor
       Extended Community: Route-Target-AS:65100:50001 TunnelEncap:tunnelTypeVxlan EvpnRouterMac:50:cb:43:fc:98:ec
       VNI: 50001
+BGP routing table entry for ip-prefix 0.0.0.0/0, Route Distinguisher: 1.1.1.2:50002
+ Paths: 2 available
+  65100 65002
+    1.1.1.2 from 100.100.100.100 (10.10.1.1)
+      Origin INCOMPLETE, metric -, localpref 100, weight 0, tag 0, valid, external, ECMP head, ECMP, best, ECMP contributor
+      Extended Community: Route-Target-AS:65100:50002 TunnelEncap:tunnelTypeVxlan EvpnRouterMac:50:cb:43:fc:98:ec
+      VNI: 50002
+  65100 65002
+    1.1.1.2 from 200.200.200.200 (10.10.11.1)
+      Origin INCOMPLETE, metric -, localpref 100, weight 0, tag 0, valid, external, ECMP, ECMP contributor
+      Extended Community: Route-Target-AS:65100:50002 TunnelEncap:tunnelTypeVxlan EvpnRouterMac:50:cb:43:fc:98:ec
+      VNI: 50002
 ```
 
 leaf3:
 ```
 Leaf-3#sh ip route vrf TENANT-B
 
-Gateway of last resort is not set
+Gateway of last resort:
+ B E      0.0.0.0/0 [200/0] via VTEP 1.1.1.2 VNI 50002 router-mac 50:cb:43:fc:98:ec local-interface Vxlan1
 
- B E      192.168.10.0/24 [200/0] via VTEP 1.1.1.2 VNI 50001 router-mac 50:cb:43:fc:98:ec local-interface Vxlan1
  C        192.168.20.0/24 is directly connected, Vlan20
 
-Leaf-3#sh bgp evpn route-type ip-prefix 192.168.10.0/24
+Leaf-3#show bgp evpn route-type ip-prefix 0.0.0.0/0
 BGP routing table information for VRF default
 Router identifier 1.1.1.3, local AS number 65003
-BGP routing table entry for ip-prefix 192.168.10.0/24, Route Distinguisher: 1.1.1.2:50001
+BGP routing table entry for ip-prefix 0.0.0.0/0, Route Distinguisher: 1.1.1.2:50001
  Paths: 2 available
   65100 65002
-    1.1.1.2 from 200.200.200.200 (10.10.11.1)
-      Origin IGP, metric -, localpref 100, weight 0, tag 0, valid, external, ECMP head, ECMP, best, ECMP contributor
+    1.1.1.2 from 100.100.100.100 (10.10.1.1)
+      Origin INCOMPLETE, metric -, localpref 100, weight 0, tag 0, valid, external, ECMP head, ECMP, best, ECMP contributor
       Extended Community: Route-Target-AS:65100:50001 TunnelEncap:tunnelTypeVxlan EvpnRouterMac:50:cb:43:fc:98:ec
       VNI: 50001
   65100 65002
-    1.1.1.2 from 100.100.100.100 (10.10.1.1)
-      Origin IGP, metric -, localpref 100, weight 0, tag 0, valid, external, ECMP, ECMP contributor
+    1.1.1.2 from 200.200.200.200 (10.10.11.1)
+      Origin INCOMPLETE, metric -, localpref 100, weight 0, tag 0, valid, external, ECMP, ECMP contributor
       Extended Community: Route-Target-AS:65100:50001 TunnelEncap:tunnelTypeVxlan EvpnRouterMac:50:cb:43:fc:98:ec
       VNI: 50001
+BGP routing table entry for ip-prefix 0.0.0.0/0, Route Distinguisher: 1.1.1.2:50002
+ Paths: 2 available
+  65100 65002
+    1.1.1.2 from 100.100.100.100 (10.10.1.1)
+      Origin INCOMPLETE, metric -, localpref 100, weight 0, tag 0, valid, external, ECMP head, ECMP, best, ECMP contributor
+      Extended Community: Route-Target-AS:65100:50002 TunnelEncap:tunnelTypeVxlan EvpnRouterMac:50:cb:43:fc:98:ec
+      VNI: 50002
+  65100 65002
+    1.1.1.2 from 200.200.200.200 (10.10.11.1)
+      Origin INCOMPLETE, metric -, localpref 100, weight 0, tag 0, valid, external, ECMP, ECMP contributor
+      Extended Community: Route-Target-AS:65100:50002 TunnelEncap:tunnelTypeVxlan EvpnRouterMac:50:cb:43:fc:98:ec
+      VNI: 50002
 ```
 
 [Конфигурационные файлы](configs/)
