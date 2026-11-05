@@ -23,6 +23,8 @@ vlan 10,20
 !
 vrf instance TENANT-A
 !
+vrf instance TENANT-B
+!
 vrf instance mgmt
 !
 interface Port-Channel1
@@ -58,9 +60,17 @@ interface Ethernet2
    link tracking group UPLINK-TRACKING upstream
 !
 interface Ethernet3
-   mtu 9000
-   channel-group 1 mode active
-   link tracking group UPLINK-TRACKING downstream
+   no switchport
+!
+interface Ethernet3.1
+   encapsulation dot1q vlan 100
+   vrf TENANT-A
+   ip address 10.10.10.1/30
+!
+interface Ethernet3.2
+   encapsulation dot1q vlan 200
+   vrf TENANT-B
+   ip address 10.10.20.1/30
 !
 interface Ethernet4
    mtu 9000
@@ -89,10 +99,12 @@ interface Management1
    dhcp client accept default-route
 !
 interface Vlan10
+   shutdown
    vrf TENANT-A
    ip address virtual 192.168.10.1/24
 !
 interface Vlan20
+   shutdown
    vrf TENANT-A
    ip address virtual 192.168.20.1/24
 !
@@ -102,12 +114,17 @@ interface Vxlan1
    vxlan vlan 10 vni 10010
    vxlan vlan 20 vni 10020
    vxlan vrf TENANT-A vni 50001
+   vxlan vrf TENANT-B vni 50002
 !
 ip virtual-router mac-address 00:00:22:22:33:33
 !
 ip routing
 ip routing vrf TENANT-A
+ip routing vrf TENANT-B
 no ip routing vrf mgmt
+!
+ip route vrf TENANT-A 0.0.0.0/0 10.10.10.2
+ip route vrf TENANT-B 0.0.0.0/0 10.10.20.2
 !
 router bgp 65002
    router-id 1.1.1.2
@@ -144,7 +161,13 @@ router bgp 65002
       rd 1.1.1.2:50001
       route-target import evpn 65100:50001
       route-target export evpn 65100:50001
-      redistribute connected
+      redistribute static
+   !
+   vrf TENANT-B
+      rd 1.1.1.2:50002
+      route-target import evpn 65100:50002
+      route-target export evpn 65100:50002
+      redistribute static
 !
 management ssh
    vrf mgmt

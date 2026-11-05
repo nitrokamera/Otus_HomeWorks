@@ -1,4 +1,4 @@
-Leaf-1#sh running-config | no-more
+Leaf-1#sh run | no-more
 ! Command: show running-config
 ! device: Leaf-1 (vEOS-lab, EOS-4.29.2F)
 !

@@ -90,7 +90,7 @@ interface Vxlan1
    vxlan source-interface Loopback0
    vxlan udp-port 4789
    vxlan vlan 20 vni 10020
-   vxlan vrf TENANT-A vni 50001
+   vxlan vrf TENANT-B vni 50002
 !
 ip virtual-router mac-address 00:00:22:22:33:33
 !
@@ -126,9 +126,9 @@ router bgp 65003
       network 1.1.1.3/32
    !
    vrf TENANT-B
-      rd 1.1.1.3:50001
-      route-target import evpn 65100:50001
-      route-target export evpn 65100:50001
+      rd 1.1.1.3:50002
+      route-target import evpn 65100:50002
+      route-target export evpn 65100:50002
 !
 management ssh
    vrf mgmt
